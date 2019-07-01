@@ -13,24 +13,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import json, sys, argparse, os
-from wawCommons import printf, eprintf, toEntityName
+import argparse
+import json
+import logging
+import os
+import sys
 
-if __name__ == '__main__':
+from wawCommons import getScriptLogger, openFile, setLoggerConfig, toEntityName
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
     parser = argparse.ArgumentParser(description='Decompose Bluemix conversation service entities in .json format to entity files in .csv format', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('entities', help='file with entities in .json format')
     parser.add_argument('entitiesDir', help='directory with entities files')
     # optional arguments
-    parser.add_argument('-ne', '--common_entities_nameCheck', action='append', nargs=2, help="regex and replacement for entity name check, e.g. '-' '_' for to replace hyphens for underscores or '$special' '\L' for lowercase")
+    parser.add_argument('-ne', '--common_entities_nameCheck', action='append', nargs=2, help="regex and replacement for entity name check, e.g. '-' '_' for to replace hyphens for underscores or '$special' '\\L' for lowercase")
     parser.add_argument('-s', '--soft', required=False, help='soft name policy - change intents and entities names without error.', action='store_true', default="")
     parser.add_argument('-v', '--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
 
-    VERBOSE = args.verbose
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
+
     NAME_POLICY = 'soft' if args.soft else 'hard'
 
-    with open(args.entities, 'r') as entitiesFile:
+    with openFile(args.entities, 'r') as entitiesFile:
         entitiesJSON = json.load(entitiesFile)
 
     systemEntities = []
@@ -49,29 +59,32 @@ if __name__ == '__main__':
                 value = []
                 # synonyms entities
                 if 'synonyms' in valueJSON:
-                    value.append(valueJSON["value"].strip().encode("utf-8"))
+                    value.append(valueJSON["value"].strip())
                     # add all synonyms
                     for synonym in valueJSON['synonyms']:
                         # empty-string synonyms are ignored when exported from WA json
-                        if synonym.strip().encode("utf-8") != '':
-                            value.append(synonym.strip().encode("utf-8"))
+                        if synonym.strip() != '':
+                            value.append(synonym.strip())
                 # for pattern entities add tilde to the value
                 if 'patterns' in valueJSON:
-                    value.append("~" + valueJSON["value"].strip().encode("utf-8"))
+                    value.append("~" + valueJSON["value"].strip())
                     # add all synonyms
                     for pattern in valueJSON["patterns"]:
-                        value.append(pattern.strip().encode("utf-8"))
+                        value.append(pattern.strip())
                 values.append(value)
             # new entity file
             entityFileName = os.path.join(args.entitiesDir, toEntityName(NAME_POLICY, args.common_entities_nameCheck, entityJSON["entity"])) + ".csv"
-            with open(entityFileName, "w") as entityFile:
+            with openFile(entityFileName, "w") as entityFile:
                 for value in values:
                     entityFile.write(';'.join(value) + "\n")
 
     # write file with system entities
-    with open(os.path.join(args.entitiesDir, "system_entities.csv"), 'w') as systemEntitiesFile:
+    with openFile(os.path.join(args.entitiesDir, "system_entities.csv"), 'w') as systemEntitiesFile:
         systemEntitiesFile.write("# a special list for the system entities - only one value at each line\n")
         for systemEntity in systemEntities:
             systemEntitiesFile.write(systemEntity + "\n")
 
-    if VERBOSE: printf("Entities from file '%s' were successfully extracted\n", args.entities)
+    logger.verbose("Entities from file '%s' were successfully extracted\n", args.entities)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

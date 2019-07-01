@@ -13,11 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import sys, argparse, os, re
+import argparse
+import logging
+import os
+import re
+import sys
 from collections import defaultdict
-from wawCommons import printf, eprintf, toIntentName, toEntityName
 
-if __name__ == '__main__':
+from wawCommons import (getScriptLogger, openFile, setLoggerConfig,
+                        toEntityName, toIntentName)
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
     parser = argparse.ArgumentParser(description='convert NLU tsv files into domain-entity and intent-entity mappings.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('entitiesDir', help='directory with entities files - all of them will be included in output list if specified')
@@ -30,16 +38,19 @@ if __name__ == '__main__':
     parser.add_argument('-ne', '--common_entities_nameCheck', action='append', nargs=2, help="regex and replacement for entity name check, e.g. '-' '_' for to replace hyphens for underscores or '$special' '\L' for lowercase")
     parser.add_argument('-s', '--soft', required=False, help='soft name policy - change intents and entities names without error.', action='store_true', default="")
     parser.add_argument('-v', '--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
+    
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
 
-    VERBOSE = args.verbose
     NAME_POLICY = 'soft' if args.soft else 'hard'
 
     domEntMap = defaultdict(dict)
     intEntMap = defaultdict(dict)
 
     if args.sentences:
-        with open(args.sentences, "r") as sentencesFile:
+        with openFile(args.sentences, "r") as sentencesFile:
             for line in sentencesFile.readlines():
                 line = line.rstrip()
                 if not line: continue
@@ -53,25 +64,25 @@ if __name__ == '__main__':
                     intEntMap[intentPart][entity] = 1
 
     if args.domEnt:
-        with open(args.domEnt, 'w') as domEntFile:
+        with openFile(args.domEnt, 'w') as domEntFile:
             for domain in sorted(domEntMap.keys()):
                 entities="NONE;"
                 for entity in sorted(domEntMap[domain].keys()):
                     entities += entity + ";"
                 domEntFile.write(domain + ";" + entities + "\n")
-        if VERBOSE: printf("Domain-entity map '%s' was successfully created\n", args.domEnt)
+        logger.debug("Domain-entity map '%s' was successfully created", args.domEnt)
 
     if args.domEnt:
-        with open(args.intEnt, 'w') as intEntFile:
+        with openFile(args.intEnt, 'w') as intEntFile:
             for intent in sorted(intEntMap.keys()):
                 entities="NONE;"
                 for entity in sorted(intEntMap[intent].keys()):
                     entities += entity + ";"
                 intEntFile.write(intent + ";" + entities + "\n")
-        if VERBOSE: printf("Intent-entity map '%s' was successfully created\n", args.domEnt)
+        logger.debug("Intent-entity map '%s' was successfully created", args.domEnt)
 
     if args.list:
-        with open(args.list, 'w') as listFile:
+        with openFile(args.list, 'w') as listFile:
             # process entities
             entityNames = []
             for entityFileName in os.listdir(args.entitiesDir):
@@ -80,4 +91,7 @@ if __name__ == '__main__':
                     entityNames.append(entityName)
             for entityName in entityNames:
                 listFile.write(entityName + ";\n")
-        if VERBOSE: printf("Entities list '%s' was successfully created\n", args.list)
+        logger.debug("Entities list '%s' was successfully created", args.list)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

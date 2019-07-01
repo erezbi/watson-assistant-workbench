@@ -1,0 +1,130 @@
+[
+    "Bad test definition",
+    {
+        "name": "Cannot open expected output",
+        "outputExpected": "@/some/random/path",
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Cannot decode json from expected output",
+        "outputExpected": "@no.json",
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Cannot open returned output",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": "@/some/random/path"
+    },
+    {
+        "name": "Cannot decode json from returned output",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": "@no.json"
+    },
+    {
+        "name": "Unknown test type",
+        "type": "BAD TYPE",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Failure",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message 2"
+        }
+    },
+    {
+        "name": "Success",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Valid time",
+        "time": 50,
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Invalid time",
+        "time": "50",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    },
+    {
+        "name": "Error from testing phase - only message",
+        "error": {
+            "message": "error message"
+        }
+    },
+    {
+        "name": "Error from testing phase - only type",
+        "error": {
+            "type": "error type"
+        }
+    },
+    {
+        "name": "Error from testing phase - message and type",
+        "error": {
+            "message": "error message",
+            "type": "error type"
+        }
+    },
+    {
+        "input": "input message",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message 2"
+        },
+        "name": "Error from testing phase - message and type and rest of the test definition",
+        "error": {
+            "message": "error message",
+            "type": "error type"
+        }
+    },
+    {
+        "name": "Class test",
+        "class": "class 1",
+        "outputExpected": {
+            "message": "test message"
+        },
+        "outputReturned": {
+            "message": "test message"
+        }
+    }
+]

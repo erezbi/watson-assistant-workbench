@@ -13,11 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import json,sys,argparse, re
-import lxml.etree as LET
-from wawCommons import printf, eprintf, toCode
+import argparse
+import json
+import logging
+import re
+import sys
 
-if __name__ == '__main__':
+import lxml.etree as LET
+
+from wawCommons import getScriptLogger, openFile, setLoggerConfig, toCode
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
     parser = argparse.ArgumentParser(description='Replaces codes in text tags with sentences specified in the resource file.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('dialog', help='dialog nodes in xml format.')
@@ -28,9 +36,12 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--inplace', required=False, help='replace input dialog by output.', action='store_true')
     parser.add_argument('-s', '--soft', required=False, help='soft name policy - change intents and entities names without error.', action='store_true', default="")
     parser.add_argument('-v', '--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
 
-    VERBOSE = args.verbose
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
+
     NAME_POLICY = 'soft' if args.soft else 'hard'
 
     # load dialog from XML
@@ -42,34 +53,37 @@ if __name__ == '__main__':
         tagsToReplace.extend(dialogXML.xpath(tagXPath))
 
     # LOAD RESOURCE FILE (TRANSLATIONS)
-    with open(args.resource, 'r') as resourceFile:
+    with openFile(args.resource, 'r') as resourceFile:
         translations = json.load(resourceFile)
 
     # REPLACE ALL CODES WITH TEXTS
     for tagToReplace in tagsToReplace:
         if tagToReplace.text is None: continue
-        if VERBOSE: printf("%s: code '%s'\n", tagToReplace.tag, tagToReplace.text)
+        logger.verbose("%s: code '%s'", tagToReplace.tag, tagToReplace.text)
         textParts = tagToReplace.text.split()
         for textPart in textParts:
             if not textPart.startswith('%%'): continue # it is not a code
             code = toCode(NAME_POLICY, textPart[2:])
             # if this tag code is not in translations dictionary -> error
             if not code in translations:
-                eprintf("ERROR: code '%s' not in resource file!\n", code)
+                logger.error("code '%s' not in resource file!", code)
             else:
                 # replace code (introduced with double %% and followed by white character or by the end) with its translation
                 newText = re.sub(r"%%"+code+"(?=\s|$)", translations[code], tagToReplace.text)
                 tagToReplace.text = newText
-        if VERBOSE: printf("-> translated as %s\n", tagToReplace.text)
+        logger.verbose("-> translated as %s", tagToReplace.text)
 
     # OUTPUT NEW DIALOG
     if args.output is not None:
-        with open (args.output, 'w') as outputFile:
+        with openFile(args.output, 'w') as outputFile:
             outputFile.write(LET.tostring(dialogXML, pretty_print=True, encoding='utf8'))
     elif args.inplace:
-        with open (args.dialog, 'w') as outputFile:
+        with openFile(args.dialog, 'w') as outputFile:
             outputFile.write(LET.tostring(dialogXML, pretty_print=True, encoding='utf8'))
     else:
         sys.stdout.write(LET.tostring(dialogXML, pretty_print=True, encoding='utf8'))
 
-    if VERBOSE: eprintf('Codes were successfully replaced with texts.\n')
+    logger.verbose('Codes were successfully replaced with texts.')
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

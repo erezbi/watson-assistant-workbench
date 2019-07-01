@@ -13,9 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import re
-from wawCommons import eprintf
-from collections import OrderedDict
 
 class EntityData(object):
     """ Represents a single entity.    """
@@ -28,4 +25,3 @@ class EntityData(object):
 
     def getValues(self):
         return self._values
-

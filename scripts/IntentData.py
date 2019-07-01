@@ -13,9 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import re
-from wawCommons import eprintf
-from collections import OrderedDict
 
 class IntentData(object):
     """ Represents a single intent.    """
@@ -28,4 +25,3 @@ class IntentData(object):
 
     def getExamples(self):
         return self._examples
-

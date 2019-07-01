@@ -13,11 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from IntentData import IntentData
 from EntityData import EntityData
+from IntentData import IntentData
 from NodeData import NodeData
-import unicodedata, unidecode
-from wawCommons import printf, eprintf, toIntentName, toEntityName
+from wawCommons import getScriptLogger, toEntityName, toIntentName
+
+logger = getScriptLogger(__file__)
+
 X_PLACEHOLDER = u'&lt;x&gt;'
 
 class DialogData(object):
@@ -40,7 +42,6 @@ class DialogData(object):
         self._domains = {}   # key: domain name, value: list of all associated nodes with the given domain
 
         self._config = config           # we need config to get NAME_POLICY, verbosity,..
-        self._VERBOSE = hasattr(config, 'common_verbose')
         self._NAME_POLICY = 'soft'      # TBD: enable to set the NamePolicy from config file
 
     #  LABEL
@@ -68,7 +69,7 @@ class DialogData(object):
             self._entities[entity_name] = EntityData()
             return self._entities[entity_name]
         else:
-            printf('INFO: Entity of given name already exists. entity_name=\n', entity_name)
+            logger.info('Entity of given name already exists. entity_name=%s', entity_name)
             return None
 
     def getAllEntities(self):
@@ -85,7 +86,7 @@ class DialogData(object):
             self._intents[intent_name] = IntentData()
             return self._intents[intent_name]
         else:
-            printf('INFO: Intent of given name already exists. intent_name=\n', intent_name)
+            logger.info('Intent of given name already exists. intent_name=%s', intent_name)
             return None
 
     def getAllIntents(self):
@@ -114,7 +115,7 @@ class DialogData(object):
             self._nodes[node_name] = NodeData()
             return self._nodes[node_name]
         else:
-            printf('INFO: Node of given name already exists. node_name=\n', node_name)
+            logger.info('Node of given name already exists. node_name=%s', node_name)
             return None
 
     def getNode(self, node_name):
@@ -142,9 +143,9 @@ class DialogData(object):
                 if label in self._labelsMap:
                     node_target= self._labelsMap[label]
                     nodeData._jumptoTarget= node_target
-                    printf('INFO: Resolving cross reference label:%s -> node_name:%s)\n', label, node_name)
+                    logger.info('Resolving cross reference label:%s -> node_name:%s)', label, node_name)
                 else:
-                    printf('INFO: Label:%s not resolved, expecting that label is external node_name\n', label)
+                    logger.info('Label:%s not resolved, expecting that label is external node_name', label)
 
 #   DOMAINS
 #******************************************
@@ -162,7 +163,7 @@ class DialogData(object):
             :returns unique intent_name or None if not able to create
         """
         #Normalize the string
-        unique_intent_name = toIntentName( self._NAME_POLICY, [['$special', '\A']], intent_name).decode('utf-8')
+        unique_intent_name = toIntentName( self._NAME_POLICY, [['$special', '\\A']], intent_name)
         if unique_intent_name not in self._intents:
             return unique_intent_name
         #try to modify by a number
@@ -182,7 +183,7 @@ class DialogData(object):
             :returns unique entity_name or None if not able to create
         """
         #Normalize the string
-        unique_entity_name = toEntityName(self._NAME_POLICY, [['$special', '\A']], entity_name).decode('utf-8')
+        unique_entity_name = toEntityName(self._NAME_POLICY, [['$special', '\\A']], entity_name)
         if unique_entity_name not in self._entities:
             return unique_entity_name
         #try to modify by a number
@@ -202,7 +203,7 @@ class DialogData(object):
             :return: unique node_name or None if not able to create
         """
         # Normalize the string
-        unique_node_name = toIntentName(self._NAME_POLICY, [['$special', '\A']], node_name).decode('utf-8').upper()
+        unique_node_name = toIntentName(self._NAME_POLICY, [['$special', '\\A']], node_name).upper()
         if unique_node_name not in self._nodes:
             return unique_node_name
         # try to modify by a number

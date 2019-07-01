@@ -13,24 +13,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import json, sys, argparse, os
-from wawCommons import printf, eprintf, toIntentName
+import argparse
+import json
+import logging
+import os
+import sys
 
-if __name__ == '__main__':
+from wawCommons import getScriptLogger, openFile, setLoggerConfig, toIntentName
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
     parser = argparse.ArgumentParser(description='Decompose Bluemix conversation service intents in .json format to intent files in .csv format', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('intents', help='file with intents in .json format')
     parser.add_argument('intentsDir', help='directory with intents files')
     # optional arguments
-    parser.add_argument('-ni', '--common_intents_nameCheck', action='append', nargs=2, help="regex and replacement for intent name check, e.g. '-' '_' for to replace hyphens for underscores or '$special' '\L' for lowercase")
+    parser.add_argument('-ni', '--common_intents_nameCheck', action='append', nargs=2, help="regex and replacement for intent name check, e.g. '-' '_' for to replace hyphens for underscores or '$special' '\\L' for lowercase")
     parser.add_argument('-s', '--soft', required=False, help='soft name policy - change intents and entities names without error.', action='store_true', default="")
     parser.add_argument('-v', '--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
 
-    VERBOSE = args.verbose
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
+
     NAME_POLICY = 'soft' if args.soft else 'hard'
 
-    with open(args.intents, 'r') as intentsFile:
+    with openFile(args.intents, 'r') as intentsFile:
         intentsJSON = json.load(intentsFile)
 
     # process all intents
@@ -41,8 +51,11 @@ if __name__ == '__main__':
             examples.append(exampleJSON["text"].strip().lower())
         # new intent file
         intentFileName = os.path.join(args.intentsDir, toIntentName(NAME_POLICY, args.common_intents_nameCheck, intentJSON["intent"]) + ".csv")
-        with open(intentFileName, "w") as intentFile:
+        with openFile(intentFileName, "w") as intentFile:
             for example in examples:
-                intentFile.write((example + "\n").encode('utf8'))
+                intentFile.write((example + "\n"))
 
-    if VERBOSE: printf("Intents from file '%s' were successfully extracted\n", args.intents)
+    logger.verbose("Intents from file '%s' were successfully extracted\n", args.intents)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

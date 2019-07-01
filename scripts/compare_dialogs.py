@@ -13,35 +13,46 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import json, sys, os.path, argparse
+import argparse
+import json
+import logging
+import os
+import os.path
+import sys
+
 from deepdiff import DeepDiff
-from wawCommons import printf, eprintf
+
+from wawCommons import getScriptLogger, setLoggerConfig
+
+logger = getScriptLogger(__file__)
 
 try:
     basestring            # Python 2
 except NameError:
     basestring = (str, )  # Python 3
 
-if __name__ == '__main__':
+def main(argv):
     parser = argparse.ArgumentParser(description='Compares dialog JSON before (input) and after (output) the conversion from JSON to WAW and back to JSON', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('inputDialogFileName', help='file with original dialog JSON')
     parser.add_argument('outputDialogFileName', help='file with output dialog JSON run through WAW scripts')
     # optional arguments
     parser.add_argument('-v','--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
 
-    VERBOSE = args.verbose
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
 
     inputpath = args.inputDialogFileName
     outputpath = args.outputDialogFileName
 
     if not os.path.isfile(inputpath):
-        eprintf("ERROR: Input dialog json '%s' does not exist.", inputpath)
+        logger.error("Input dialog json '%s' does not exist.", inputpath)
         exit(1)
 
     if not os.path.isfile(outputpath):
-        eprintf("ERROR: Output dialog json '%s' does not exist.", outputpath)
+        logger.error("Output dialog json '%s' does not exist.", outputpath)
         exit(1)
 
     with open(inputpath) as f:
@@ -50,26 +61,15 @@ if __name__ == '__main__':
     with open(outputpath) as g:
         dialogOutputUnsorted = json.load(g)
 
-    # from https://stackoverflow.com/questions/25851183/how-to-compare-two-json-objects-with-the-same-elements-in-a-different-order-equa
-    def ordered(obj):
-        if isinstance(obj, dict):
-            return sorted((k, ordered(v)) for k, v in obj.items())
-        if isinstance(obj, list):
-            return sorted(ordered(x) for x in obj)
-        else:
-            return obj
-    # ^^^
-
-    dialogInputDict = ordered(dialogInputUnsorted)
-    dialogOutputDict = ordered(dialogOutputUnsorted)
-
-    result = json.dumps(DeepDiff(dialogInputDict,dialogOutputDict), indent=4)
-    if VERBOSE:
-        printf("result: %s", result)
+    result = DeepDiff(dialogInputUnsorted, dialogOutputUnsorted, ignore_order=True).json
+    logger.debug("result: %s", json.dumps(result, indent=4))
 
     if result == '{}':
-        printf('Dialog JSONs are same.')
+        logger.info("Dialog JSONs are same.")
         exit(0)
     else:
-        printf('Dialog JSONs differ.')
+        logger.info("Dialog JSONs differ.")
         exit(1)
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

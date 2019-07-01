@@ -13,11 +13,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import json,sys,argparse
-import lxml.etree as LET
-from wawCommons import printf, eprintf, toCode
+import argparse
+import json
+import logging
+import sys
 
-if __name__ == '__main__':
+import lxml.etree as LET
+
+from wawCommons import getScriptLogger, openFile, setLoggerConfig, toCode
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
     parser = argparse.ArgumentParser(description='Replaces sentences in text tags with codes and creates resource file with translations from codes to sentences.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # positional arguments
     parser.add_argument('dialog', help='dialog nodes in xml format.')
@@ -31,13 +38,17 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--inplace', required=False, help='replace input dialog by output.', action='store_true')
     parser.add_argument('-s', '--soft', required=False, help='soft name policy - change intents and entities names without error.', action='store_true', default="")
     parser.add_argument('-v', '--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
+    
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
 
-    VERBOSE = args.verbose
     NAME_POLICY = 'soft' if args.soft else 'hard'
     PREFIX = toCode(NAME_POLICY, args.prefix)
 
     # load dialog from XML
+    # TODO might need UTF-8
     dialogsXML = LET.parse(args.dialog)
 
     # find all tags with texts to replace
@@ -47,7 +58,7 @@ if __name__ == '__main__':
 
     # LOAD EXISTING RESOURCE FILE (TRANSLATIONS)
     if args.join:
-        with open(args.resource, 'r') as resourceFile:
+        with openFile(args.resource, 'r') as resourceFile:
             translations = json.load(resourceFile)
     else:
         translations = {}
@@ -57,7 +68,7 @@ if __name__ == '__main__':
     # REPLACE ALL TEXTS WITH CODES
     for tagToReplace in tagsToReplace:
         text = tagToReplace.text
-        if VERBOSE: printf("%s: %s\n", tagToReplace.tag, tagToReplace.text)
+        logger.verbose("%s: %s", tagToReplace.tag, tagToReplace.text)
         # if this tag text is not in translations dictionary (it has not a code),
         # create new code for it and add it to dictionary
         if not text in translations.values():
@@ -66,27 +77,30 @@ if __name__ == '__main__':
         # replace tag text by its code
         code = translations.keys()[translations.values().index(text)] # returns key (code) for this value (text)
         tagToReplace.text = '%%' + code
-        if VERBOSE: printf("-> encoded as %s\n", code)
+        logger.verbose("-> encoded as %s", code)
 
     # OUTPUT NEW DIALOG
     if args.output is not None:
-        with open (args.output, 'w') as outputFile:
+        with openFile(args.output, 'w') as outputFile:
             outputFile.write(LET.tostring(dialogsXML, pretty_print=True, encoding='utf8'))
     elif args.inplace:
-        with open (args.dialog, 'w') as outputFile:
+        with openFile(args.dialog, 'w') as outputFile:
             outputFile.write(LET.tostring(dialogsXML, pretty_print=True, encoding='utf8'))
     else:
         sys.stdout.write(LET.tostring(dialogsXML, pretty_print=True, encoding='utf8'))
 
     # EXTEND RESOURCE FILE
     if args.append:
-        with open(args.resource, 'r') as resourceFile:
+        with openFile(args.resource, 'r') as resourceFile:
             resourceJSON = json.load(resourceFile)
             resourceJSON.update(translations) # add new translations to existing ones (Duplicate codes will be overwritten by new ones.)
             translations = resourceJSON
 
     # CREATE RESOURCE FILE
-    with open (args.resource, 'w') as resourceFile:
-        resourceFile.write(json.dumps(translations, indent=4, ensure_ascii=False).encode('utf8'))
+    with openFile(args.resource, 'w') as resourceFile:
+        resourceFile.write(json.dumps(translations, indent=4, ensure_ascii=False))
 
-    if VERBOSE: eprintf('Texts were successfully replaced with codes.\n')
+    logger.verbose('Texts were successfully replaced with codes.')
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

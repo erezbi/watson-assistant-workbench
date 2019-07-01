@@ -13,53 +13,86 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import sys, argparse, requests, configparser
-from wawCommons import printf, eprintf
+import argparse
+import logging
+import os
+import sys
+
+import requests
+
+from cfgCommons import Cfg
+from wawCommons import (errorsInResponse, filterWorkspaces,
+                        getOptionalParameter, getRequiredParameter,
+                        getScriptLogger, getWorkspaces, setLoggerConfig)
+
+logger = getScriptLogger(__file__)
+
+def main(argv):
+    logger.info('STARTING: ' + os.path.basename(__file__))
+    parser = argparse.ArgumentParser(description='Deletes Bluemix conversation service workspace and deletes workspace id from config file.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-c', '--common_configFilePaths', help='configuaration file', action='append')
+    parser.add_argument('-oc', '--common_output_config', help='output configuration file')
+    parser.add_argument('-cu','--conversation_url', required=False, help='url of the conversation service API')
+    parser.add_argument('-cv','--conversation_version', required=False, help='version of the conversation service API')
+    parser.add_argument('-cn','--conversation_username', required=False, help='username of the conversation service instance')
+    parser.add_argument('-cp','--conversation_password', required=False, help='password of the conversation service instance')
+    parser.add_argument('-cid','--conversation_workspace_id', required=False, help='workspace_id of the application.')
+    parser.add_argument('-wn','--conversation_workspace_name', required=False, help='name of the workspace')
+    parser.add_argument('-wnm','--conversation_workspace_match_by_name', required=False, help='true if the workspace name should be matched by name (or pattern if defined)')
+    parser.add_argument('-wnp','--conversation_workspace_name_pattern', required=False, help='regex pattern specifying a name of workspaces to be deleted')
+    parser.add_argument('-v','--verbose', required=False, help='verbosity', action='store_true')
+    parser.add_argument('--log', type=str.upper, default=None, choices=list(logging._levelToName.values()))
+    args = parser.parse_args(argv)
+
+    if __name__ == '__main__':
+        setLoggerConfig(args.log, args.verbose)
+
+    config = Cfg(args)
+
+    # load credentials
+    version = getRequiredParameter(config, 'conversation_version')
+    workspacesUrl = getRequiredParameter(config, 'conversation_url')
+    username = getRequiredParameter(config, 'conversation_username')
+    password = getRequiredParameter(config, 'conversation_password')
+    try:
+        workspaces = filterWorkspaces(config, getWorkspaces(workspacesUrl, version, username, password))
+    except SystemExit:
+        logger.error("Failed to retrieve workspaces to delete.")
+        sys.exit(1)
+
+    nWorkspacesDeleted = 0
+    for workspace in workspaces:
+        # delete workspace
+        requestUrl = workspacesUrl + '/' + workspace['workspace_id'] + '?version=' + version
+        response = requests.delete(requestUrl, auth=(username, password), headers={'Accept': 'text/html'})
+        responseJson = response.json()
+        # check errors during upload
+        errorsInResponse(responseJson)
+
+        if response.status_code == 200:
+            nWorkspacesDeleted += 1
+            logger.info("Workspace '%s' was successfully deleted", workspace['name'])
+            # delete workspaceId from config file
+            if hasattr(config, 'conversation_workspace_id'):
+                delattr(config, 'conversation_workspace_id')
+        elif response.status_code == 400:
+            logger.error("Error while deleting workspace  '%s', status code '%s' (invalid request)", workspace['name'], response.status_code)
+            sys.exit(1)
+        else:
+            logger.error("Error while deleting workspace  '%s', status code '%s'", workspace['name'], response.status_code)
+            sys.exit(1)
+
+    if not nWorkspacesDeleted:
+        logger.info("No workspace has been deleted")
+    elif nWorkspacesDeleted == 1:
+        logger.info("One workspace has been successfully deleted")
+    else:
+        logger.info(str(nWorkspacesDeleted) + " workspaces have been successfully deleted")
+
+    outputConfigFile = getOptionalParameter(config, 'common_output_config')
+    if outputConfigFile:
+        config.saveConfiguration(outputConfigFile)
+        logger.info("Configuration was saved to %s", outputConfigFile)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Deletes Bluemix conversation service workspace and deletes workspace id from config file.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # positional arguments
-    parser.add_argument('config', help='file containing section \'[conversation]\' with workspaces url=\'<url>\', conversation version=\'<version>\', username=\'<username>\', password=\'<password>\' and workspace_id=\'<workspace_id>\' ')
-    # optional arguments
-    parser.add_argument('-v','--verbose', required=False, help='verbosity', action='store_true')
-    args = parser.parse_args(sys.argv[1:])
-
-    VERBOSE = args.verbose
-
-    # load config file
-    conversationSection = 'conversation'
-    try:
-        config = configparser.ConfigParser()
-        config.read(args.config)
-        workspacesUrl = config.get(conversationSection, 'url')
-        version = config.get(conversationSection, 'version')
-        username = config.get(conversationSection, 'username')
-        printf('WCS USERNAME: %s\n', username)
-        password = config.get(conversationSection, 'password')
-        printf('WCS PASSWORD: %s\n', password)
-        workspaceId = config.get(conversationSection, 'workspace_id')
-        printf('WCS WORKSPACE_ID: %s\n', workspaceId)
-        workspacesUrl += '/' + workspaceId
-    except IOError:
-        eprintf('ERROR: Cannot load config file %s\n', args.config)
-        sys.exit(1)
-
-    # delete workspace
-    workspacesUrl += '?version=' + version
-    response = requests.delete(workspacesUrl, auth=(username, password), headers={'Accept': 'text/html'})
-    responseJson = response.json()
-
-    # check errors during upload
-    if 'error' in responseJson:
-        eprintf('Cannot delete conversation workspace\nERROR: %s\n', responseJson['error'])
-        sys.exit(1)
-    if response.status_code == 200:
-        printf('Workspace was successfully deleted\n')
-    else:
-        eprintf('ERROR: Error while deleting workspace, status code %s\n', response.status_code)
-        sys.exit(1)
-
-    # delete workspaceId from config file
-    config.remove_option(conversationSection, 'workspace_id')
-    with open(args.config, 'wb') as configFile:
-        config.write(configFile)
+    main(sys.argv[1:])
