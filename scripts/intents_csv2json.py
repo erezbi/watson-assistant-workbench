@@ -111,6 +111,7 @@ def main(argv):
     filesAtPath = getFilesAtPath(pathList)
     for intentFileName in sorted(filesAtPath):
         intentName = toIntentName(NAME_POLICY, args.common_intents_nameCheck, os.path.splitext(os.path.basename(intentFileName))[0])
+        print('intentName is: ' + intentName)
         with openFile(intentFileName, 'r', encoding='utf8') as intentFile:
             intent = {}
             intent['intent'] = intentName
