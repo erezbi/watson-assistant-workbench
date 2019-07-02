@@ -111,10 +111,12 @@ def main(argv):
     filesAtPath = getFilesAtPath(pathList)
     for intentFileName in sorted(filesAtPath):
         intentName = toIntentName(NAME_POLICY, args.common_intents_nameCheck, os.path.splitext(os.path.basename(intentFileName))[0])
+        print('intentName is: ' + intentName)
         with openFile(intentFileName, 'r', encoding='utf8') as intentFile:
             intent = {}
             intent['intent'] = intentName
             examples = []
+            print("examples:")
             for line in intentFile:
                 # remove comments
                 line = line.split('#')[0]
@@ -126,6 +128,8 @@ def main(argv):
                     #adding to the list
                     if example:
                         examples.append(example)
+                        print(example)
+            print('\n')
 
             intent['examples'] = examples
             intents.append(intent)
